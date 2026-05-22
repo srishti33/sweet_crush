@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sweet Crush — Match 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg1:#1a0533;--bg2:#2d0a5e;--bg3:#6b21a8;
+  --panel:rgba(255,255,255,0.08);--panelborder:rgba(255,255,255,0.15);
+  --text:#fff;--text2:rgba(255,255,255,0.7);--text3:rgba(255,255,255,0.4);
+  --cell:72px;--gap:5px;
+}
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+  font-family:'Nunito',sans-serif;
+  background:linear-gradient(160deg,#1a0533,#2d0a5e,#6b21a8);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:12px 8px 8px;
+  min-height:100vh;
+  position:relative;overflow:hidden;
+}
+/* BG bubbles */
+.bubble{position:fixed;border-radius:50%;pointer-events:none;animation:floatBubble linear infinite}
+@keyframes floatBubble{0%{transform:translateY(100vh) scale(0)}80%{opacity:.4}100%{transform:translateY(-120px) scale(1);opacity:0}}
+
+/* STARS */
+#stars-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.star{position:absolute;border-radius:50%;background:#fff;animation:twinkle var(--d,2s) ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.05}to{opacity:.6}}
+
+/* TITLE */
+.title-bar{position:relative;z-index:10;text-align:center;margin-bottom:10px}
+.game-title{font-family:'Fredoka One',cursive;font-size:clamp(28px,7vw,44px);
+  background:linear-gradient(135deg,#fde047,#fb923c,#f472b6,#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 2px 8px rgba(251,146,60,.4));letter-spacing:.02em;line-height:1}
+.title-sub{font-size:12px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px}
+
+/* TOP HUD */
+.hud{display:flex;gap:10px;margin-bottom:10px;position:relative;z-index:10;width:100%;max-width:520px}
+.hud-card{flex:1;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--panelborder);border-radius:16px;padding:8px 12px;text-align:center}
+.hud-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:3px}
+.hud-val{font-family:'Fredoka One',cursive;font-size:24px;line-height:1;color:#fde047;text-shadow:0 0 16px rgba(253,224,71,.5)}
+.hud-val.lives{color:#f472b6;text-shadow:0 0 16px rgba(244,114,182,.5)}
+.hud-val.level{color:#86efac;text-shadow:0 0 16px rgba(134,239,172,.5)}
+
+/* TARGET BAR */
+.target-bar{width:100%;max-width:520px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--panelborder);border-radius:14px;padding:8px 14px;margin-bottom:10px;position:relative;z-index:10}
+.target-row{display:flex;align-items:center;justify-content:space-between}
+.target-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+.target-items{display:flex;gap:14px}
+.target-item{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--text)}
+.target-emoji{font-size:20px;filter:drop-shadow(0 0 4px rgba(255,255,255,.3))}
+.target-count{font-family:'Fredoka One',cursive;font-size:16px}
+.target-count.done{color:#86efac;text-decoration:line-through;opacity:.6}
+.moves-left{font-family:'Fredoka One',cursive;font-size:18px;color:#fde047}
+.moves-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:right}
+
+/* PROGRESS BAR */
+.progress-wrap{width:100%;max-width:520px;margin-bottom:10px;position:relative;z-index:10}
+.progress-track{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#f472b6,#a78bfa,#60a5fa);transition:width .5s ease;position:relative}
+.progress-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shimmer 1.5s ease-in-out infinite}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+
+/* BOARD */
+.board-wrap{position:relative;z-index:10}
+#board{
+  display:grid;
+  grid-template-columns:repeat(8,var(--cell));
+  gap:var(--gap);
+  padding:10px;
+  background:rgba(0,0,0,.25);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);
+  user-select:none;
+}
+.cell{
+  width:var(--cell);height:var(--cell);
+  border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;
+  cursor:pointer;
+  position:relative;
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1);
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);
+  user-select:none;
+}
+.cell:hover{transform:scale(1.08);z-index:2}
+.cell.selected{
+  transform:scale(1.12);
+  background:rgba(255,255,255,.25);
+  border-color:rgba(255,255,255,.7);
+  box-shadow:0 0 0 3px rgba(255,255,255,.35),0 0 20px rgba(255,255,255,.2);
+  z-index:3;
+}
+.cell.hint{animation:hintPulse 0.7s ease-in-out infinite alternate}
+@keyframes hintPulse{from{box-shadow:0 0 0 2px rgba(253,224,71,.4)}to{box-shadow:0 0 0 5px rgba(253,224,71,.8),0 0 20px rgba(253,224,71,.4)}}
+.cell.matched{animation:matchPop .3s cubic-bezier(.34,1.56,.64,1) forwards}
+@keyframes matchPop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(0);opacity:0}}
+.cell.falling{animation:fallIn .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes fallIn{from{transform:translateY(-60px) scale(.7);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+.cell.invalid-shake{animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.cell.special{box-shadow:0 0 14px 4px rgba(253,224,71,.6),inset 0 0 10px rgba(255,255,255,.2)}
+.cell.special::after{content:'⭐';position:absolute;top:-4px;right:-4px;font-size:14px;animation:spinStar 2s linear infinite}
+@keyframes spinStar{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.cell[data-t="bomb"]::after{content:'💣';position:absolute;top:-5px;right:-5px;font-size:14px}
+.cell[data-t="rainbow"]{ background:linear-gradient(135deg,rgba(244,114,182,.3),rgba(167,139,250,.3),rgba(96,165,250,.3),rgba(52,211,153,.3),rgba(253,224,71,.3)) !important;border-color:rgba(255,255,255,.5)!important}
+
+/* CANDY COLORS */
+.candy-0{background:radial-gradient(circle at 35% 35%,rgba(248,113,113,.6),rgba(239,68,68,.3))!important;border-color:rgba(248,113,113,.5)!important}
+.candy-1{background:radial-gradient(circle at 35% 35%,rgba(251,191,36,.6),rgba(245,158,11,.3))!important;border-color:rgba(251,191,36,.5)!important}
+.candy-2{background:radial-gradient(circle at 35% 35%,rgba(52,211,153,.6),rgba(16,185,129,.3))!important;border-color:rgba(52,211,153,.5)!important}
+.candy-3{background:radial-gradient(circle at 35% 35%,rgba(96,165,250,.6),rgba(59,130,246,.3))!important;border-color:rgba(96,165,250,.5)!important}
+.candy-4{background:radial-gradient(circle at 35% 35%,rgba(196,181,253,.6),rgba(139,92,246,.3))!important;border-color:rgba(196,181,253,.5)!important}
+.candy-5{background:radial-gradient(circle at 35% 35%,rgba(249,168,212,.6),rgba(236,72,153,.3))!important;border-color:rgba(249,168,212,.5)!important}
+
+/* OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(10,5,25,.85);backdrop-filter:blur(8px);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:linear-gradient(160deg,rgba(45,10,94,.9),rgba(107,33,168,.7));border:1px solid rgba(255,255,255,.2);border-radius:28px;padding:2.5rem 2rem;text-align:center;max-width:340px;width:90%;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:modalIn .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes modalIn{from{transform:scale(.7) translateY(30px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.modal-emoji{font-size:70px;display:block;margin-bottom:.75rem;animation:bigBounce .7s cubic-bezier(.34,1.56,.64,1)}
+@keyframes bigBounce{0%{transform:scale(0) rotate(-15deg)}60%{transform:scale(1.15) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
+.modal-title{font-family:'Fredoka One',cursive;font-size:34px;margin-bottom:.5rem;background:linear-gradient(135deg,#fde047,#fb923c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.modal-msg{font-size:14px;color:var(--text2);margin-bottom:1.75rem;line-height:1.6}
+.modal-score{font-family:'Fredoka One',cursive;font-size:42px;color:#fde047;text-shadow:0 0 20px rgba(253,224,71,.5);margin:.5rem 0}
+.btn{display:inline-block;padding:14px 36px;border:none;border-radius:50px;font-family:'Fredoka One',cursive;font-size:20px;cursor:pointer;transition:transform .15s,box-shadow .15s;margin:4px}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff;box-shadow:0 6px 24px rgba(139,92,246,.5)}
+.btn-primary:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 32px rgba(139,92,246,.65)}
+.btn-secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2)}
+.btn-secondary:hover{background:rgba(255,255,255,.2)}
+
+/* FLOATING SCORE */
+.float-score{position:fixed;font-family:'Fredoka One',cursive;font-size:22px;pointer-events:none;z-index:50;animation:floatScore 1.2s ease-out forwards;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+@keyframes floatScore{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(1.3)}}
+
+/* COMBO */
+#combo-display{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Fredoka One',cursive;font-size:clamp(36px,10vw,60px);pointer-events:none;z-index:60;display:none;text-align:center;animation:comboPop .6s cubic-bezier(.34,1.56,.64,1) forwards}
+@keyframes comboPop{0%{transform:translate(-50%,-50%) scale(0) rotate(-10deg);opacity:0}50%{transform:translate(-50%,-50%) scale(1.2) rotate(3deg);opacity:1}100%{transform:translate(-50%,-50%) scale(0.9) rotate(0deg);opacity:0}}
+
+/* LEVEL COMPLETE STARS */
+.stars-row{display:flex;justify-content:center;gap:8px;margin:1rem 0}
+.star-icon{font-size:44px;animation:starPop .4s cubic-bezier(.34,1.56,.64,1) both}
+.star-icon:nth-child(1){animation-delay:.1s}
+.star-icon:nth-child(2){animation-delay:.3s}
+.star-icon:nth-child(3){animation-delay:.5s}
+@keyframes starPop{0%{transform:scale(0) rotate(-30deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+
+/* RESPONSIVE */
+@media(max-width:650px){
+  :root{--cell:42px;--gap:4px}
+  .cell{font-size:22px;border-radius:10px}
+  .hud-val{font-size:18px}
+  .game-title{font-size:28px}
+}
+@media(max-width:400px){
+  :root{--cell:38px;--gap:3px}
+  .cell{font-size:20px;border-radius:9px}
+}
+</style>
+</head>
+<body>
+<div id="stars-bg"></div>
+
+<!-- Title -->
+<div class="title-bar">
+  <div class="game-title">🍬 Sweet Crush</div>
+  <div class="title-sub">Match 3 to clear the board</div>
+</div>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="hud-card"><div class="hud-label">Score</div><div class="hud-val" id="score-disp">0</div></div>
+  <div class="hud-card"><div class="hud-label">Level</div><div class="hud-val level" id="level-disp">1</div></div>
+  <div class="hud-card"><div class="hud-label">Best</div><div class="hud-val" style="color:#fb923c;text-shadow:0 0 16px rgba(251,146,60,.5)" id="best-disp">0</div></div>
+  <div class="hud-card"><div class="hud-label">Lives</div><div class="hud-val lives" id="lives-disp">❤️❤️❤️</div></div>
+</div>
+
+<!-- Target -->
+<div class="target-bar">
+  <div class="target-row">
+    <div>
+      <div class="target-label">Collect</div>
+      <div class="target-items" id="target-items"></div>
+    </div>
+    <div style="text-align:right">
+      <div class="moves-label">Moves</div>
+      <div class="moves-left" id="moves-disp">30</div>
+    </div>
+  </div>
+</div>
+
+<!-- Progress -->
+<div class="progress-wrap">
+  <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+</div>
+
+<!-- Board -->
+<div class="board-wrap">
+  <div id="board"></div>
+</div>
+
+<div id="combo-display"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const COLS=8,ROWS=8;
+const CANDIES=["🍭","🍬","🍫","🍊","🍇","🍓"];
+const CANDY_TYPES=CANDIES.length;
+const SPECIAL_THRESHOLD=5; // 5-in-a-row → bomb
+const RAINBOW_THRESHOLD=6;
+
+// ─── STATE ────────────────────────────────────────────────
+let board=[],score=0,best=parseInt(localStorage.getItem("sc_best")||"0"),
+    level=1,lives=3,moves=30,comboCount=0,
+    selected=null,animating=false,
+    targets={},collected={},hintTimer=null;
+
+// Level configs
+function getLevelConfig(lvl){
+  const base=20+lvl*5;
+  const numTargets=lvl<3?2:lvl<6?3:4;
+  const tgt={};
+  const shuffled=[...CANDIES].sort(()=>Math.random()-.5).slice(0,numTargets);
+  shuffled.forEach(c=>{ tgt[c]=10+lvl*3; });
+  return {moves:Math.max(15,35-lvl*2),targets:tgt,targetScore:base*50};
+}
+
+// ─── STARS BG ─────────────────────────────────────────────
+function makeStars(){
+  const c=document.getElementById("stars-bg"); c.innerHTML="";
+  for(let i=0;i<80;i++){
+    const s=document.createElement("div"); s.className="star";
+    const sz=Math.random()*2+1;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${(Math.random()*3+1).toFixed(1)}s;animation-delay:${(Math.random()*4).toFixed(1)}s`;
+    c.appendChild(s);
+  }
+}
+
+// Background bubbles
+function makeBubbles(){
+  for(let i=0;i<6;i++){
+    const b=document.createElement("div"); b.className="bubble";
+    const sz=Math.random()*120+40;
+    const colors=["rgba(139,92,246,.15)","rgba(236,72,153,.12)","rgba(96,165,250,.12)","rgba(52,211,153,.1)"];
+    b.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;background:${colors[i%colors.length]};animation-duration:${Math.random()*12+8}s;animation-delay:-${Math.random()*10}s`;
+    document.body.appendChild(b);
+  }
+}
+
+// ─── BOARD INIT ───────────────────────────────────────────
+function initBoard(){
+  board=[];
+  for(let r=0;r<ROWS;r++){
+    board[r]=[];
+    for(let c=0;c<COLS;c++){
+      board[r][c]=randomCandy(r,c);
+    }
+  }
+  // ensure no starting matches
+  for(let r=0;r<ROWS;r++)
+    for(let c=0;c<COLS;c++){
+      let tries=0;
+      while(hasMatchAt(r,c)&&tries<20){
+        board[r][c]=Math.floor(Math.random()*CANDY_TYPES);
+        tries++;
+      }
+    }
+}
+
+function randomCandy(r,c){
+  let v=Math.floor(Math.random()*CANDY_TYPES);
+  return v;
+}
+
+function hasMatchAt(r,c){
+  const v=board[r][c];
+  if(typeof v!=="number")return false;
+  // horizontal
+  if(c>=2&&board[r][c-1]===v&&board[r][c-2]===v)return true;
+  // vertical
+  if(r>=2&&board[r-1]&&board[r-1][c]===v&&board[r-2]&&board[r-2][c]===v)return true;
+  return false;
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderBoard(){
+  const bEl=document.getElementById("board");
+  bEl.innerHTML="";
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const cell=document.createElement("div");
+      cell.className="cell candy-"+getCandyIdx(board[r][c]);
+      cell.dataset.r=r; cell.dataset.c=c;
+      const candyIdx=getCandyIdx(board[r][c]);
+      cell.dataset.t=board[r][c]==="bomb"?"bomb":board[r][c]==="rainbow"?"rainbow":"normal";
+      if(board[r][c]==="bomb"){cell.textContent="💣";cell.className="cell special";cell.dataset.t="bomb";}
+      else if(board[r][c]==="rainbow"){cell.textContent="🌈";cell.className="cell candy-"+candyIdx;cell.dataset.t="rainbow";}
+      else{cell.textContent=CANDIES[board[r][c]]; cell.className="cell candy-"+candyIdx;}
+      if(selected&&selected[0]===r&&selected[1]===c) cell.classList.add("selected");
+      cell.addEventListener("click",()=>onCellClick(r,c));
+      cell.addEventListener("touchstart",(e)=>{e.preventDefault();onCellClick(r,c)},{passive:false});
+      bEl.appendChild(cell);
+    }
+  }
+}
+
+function getCandyIdx(v){
+  if(typeof v==="number")return v%CANDY_TYPES;
+  return 0;
+}
+
+function getCell(r,c){
+  return document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+}
+
+// ─── INTERACTION ─────────────────────────────────────────
+function onCellClick(r,c){
+  if(animating||moves<=0)return;
+  clearHint();
+  if(!selected){
+    selected=[r,c];
+    renderBoard();
+    scheduleHint();
+    return;
+  }
+  const [sr,sc]=selected;
+  if(sr===r&&sc===c){ selected=null; renderBoard(); scheduleHint(); return; }
+  // adjacent?
+  const dr=Math.abs(r-sr), dc=Math.abs(c-sc);
+  if((dr===1&&dc===0)||(dr===0&&dc===1)){
+    selected=null;
+    trySwap(sr,sc,r,c);
+  } else {
+    selected=[r,c];
+    renderBoard();
+    scheduleHint();
+  }
+}
+
+async function trySwap(r1,c1,r2,c2){
+  animating=true;
+  clearHint();
+  swapCells(r1,c1,r2,c2);
+  const matches=findAllMatches();
+  if(matches.length===0){
+    // invalid — swap back
+    swapCells(r1,c1,r2,c2);
+    animating=false;
+    renderBoard();
+    const c1El=getCell(r1,c1), c2El=getCell(r2,c2);
+    if(c1El){c1El.classList.add("invalid-shake");setTimeout(()=>c1El.classList.remove("invalid-shake"),300);}
+    if(c2El){c2El.classList.add("invalid-shake");setTimeout(()=>c2El.classList.remove("invalid-shake"),300);}
+    scheduleHint();
+    return;
+  }
+  moves--;
+  comboCount=0;
+  updateHUD();
+  await processMatches();
+  animating=false;
+  renderBoard();
+  checkGameState();
+  scheduleHint();
+}
+
+function swapCells(r1,c1,r2,c2){
+  [board[r1][c1],board[r2][c2]]=[board[r2][c2],board[r1][c1]];
+}
+
+// ─── MATCH FINDING ───────────────────────────────────────
+function findAllMatches(){
+  const matched=new Set();
+  // horizontal
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS-2;c++){
+      const v=board[r][c];
+      if(v===null||typeof v==="string")continue;
+      let len=1;
+      while(c+len<COLS&&board[r][c+len]===v)len++;
+      if(len>=3){
+        for(let k=0;k<len;k++) matched.add(r*COLS+(c+k));
+        // special creation
+        if(len>=RAINBOW_THRESHOLD) board[r][c+Math.floor(len/2)]="rainbow";
+        else if(len>=SPECIAL_THRESHOLD) board[r][c+Math.floor(len/2)]="bomb";
+        c+=len-1;
+      }
+    }
+  }
+  // vertical
+  for(let c=0;c<COLS;c++){
+    for(let r=0;r<ROWS-2;r++){
+      const v=board[r][c];
+      if(v===null||typeof v==="string")continue;
+      let len=1;
+      while(r+len<ROWS&&board[r+len][c]===v)len++;
+      if(len>=3){
+        for(let k=0;k<len;k++) matched.add((r+k)*COLS+c);
+        if(len>=RAINBOW_THRESHOLD) board[r+Math.floor(len/2)][c]="rainbow";
+        else if(len>=SPECIAL_THRESHOLD) board[r+Math.floor(len/2)][c]="bomb";
+        r+=len-1;
+      }
+    }
+  }
+  return [...matched];
+}
+
+async function processMatches(){
+  let cascade=0;
+  while(true){
+    const matches=findAllMatches();
+    if(matches.length===0) break;
+    cascade++;
+    comboCount++;
+    if(comboCount>=2) showCombo(comboCount);
+    // expand bomb/rainbow matches
+    const toRemove=new Set(matches);
+    matches.forEach(idx=>{
+      const r=Math.floor(idx/COLS),c=idx%COLS;
+      if(board[r][c]==="bomb"){
+        // remove 3x3 around
+        for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+          const nr=r+dr,nc=c+dc;
+          if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) toRemove.add(nr*COLS+nc);
+        }
+      }
+      if(board[r][c]==="rainbow"){
+        // remove all candies of most common type
+        const counts={};
+        for(let rr=0;rr<ROWS;rr++) for(let cc=0;cc<COLS;cc++){
+          const v=board[rr][cc];
+          if(typeof v==="number") counts[v]=(counts[v]||0)+1;
+        }
+        const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+        if(top){
+          const tv=parseInt(top[0]);
+          for(let rr=0;rr<ROWS;rr++) for(let cc=0;cc<COLS;cc++){
+            if(board[rr][cc]===tv) toRemove.add(rr*COLS+cc);
+          }
+        }
+      }
+    });
+    // animate matches
+    toRemove.forEach(idx=>{
+      const r=Math.floor(idx/COLS),c=idx%COLS;
+      const el=getCell(r,c);
+      if(el){el.classList.add("matched");}
+      // collect targets
+      const v=board[r][c];
+      if(typeof v==="number"){
+        const candy=CANDIES[v];
+        if(targets[candy]!==undefined){
+          collected[candy]=(collected[candy]||0)+1;
+        }
+      }
+    });
+    // score
+    const basePoints=toRemove.size*100;
+    const comboMult=Math.min(cascade,5);
+    const pts=basePoints*comboMult;
+    score+=pts;
+    if(score>best){best=score;localStorage.setItem("sc_best",best);}
+    floatScore("+"+pts+(comboMult>1?"  x"+comboMult+"!":""),comboMult>1?"#fde047":"#86efac");
+    await sleep(350);
+    // remove matched
+    toRemove.forEach(idx=>{
+      const r=Math.floor(idx/COLS),c=idx%COLS;
+      board[r][c]=null;
+    });
+    await dropCandies();
+    await fillBoard();
+    updateHUD();
+    updateTargetDisplay();
+    renderBoard();
+    await sleep(100);
+  }
+}
+
+async function dropCandies(){
+  for(let c=0;c<COLS;c++){
+    let empty=ROWS-1;
+    for(let r=ROWS-1;r>=0;r--){
+      if(board[r][c]!==null){
+        board[empty][c]=board[r][c];
+        if(empty!==r) board[r][c]=null;
+        empty--;
+      }
+    }
+    for(let r=empty;r>=0;r--) board[r][c]=null;
+  }
+}
+
+async function fillBoard(){
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(board[r][c]===null){
+        board[r][c]=Math.floor(Math.random()*CANDY_TYPES);
+      }
+    }
+  }
+  renderBoard();
+  // animate new cells
+  for(let r=0;r<ROWS;r++)
+    for(let c=0;c<COLS;c++){
+      const el=getCell(r,c);
+      if(el){el.classList.add("falling");setTimeout(()=>el&&el.classList.remove("falling"),300);}
+    }
+  await sleep(300);
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ─── HINT ─────────────────────────────────────────────────
+function scheduleHint(){
+  clearHint();
+  hintTimer=setTimeout(showHint,4000);
+}
+function clearHint(){
+  clearTimeout(hintTimer);
+  document.querySelectorAll(".hint").forEach(el=>el.classList.remove("hint"));
+}
+function showHint(){
+  // find first valid swap
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const neighbors=[[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+      for(const[nr,nc]of neighbors){
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;
+        swapCells(r,c,nr,nc);
+        const m=findAllMatches();
+        swapCells(r,c,nr,nc);
+        if(m.length>0){
+          const el1=getCell(r,c),el2=getCell(nr,nc);
+          if(el1)el1.classList.add("hint");
+          if(el2)el2.classList.add("hint");
+          return;
+        }
+      }
+    }
+  }
+}
+
+// ─── FLOAT SCORE ──────────────────────────────────────────
+function floatScore(text,color="#fde047"){
+  const el=document.createElement("div");
+  el.className="float-score";
+  el.textContent=text;
+  el.style.cssText=`color:${color};left:${30+Math.random()*40}%;top:${40+Math.random()*20}%`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1300);
+}
+
+// ─── COMBO DISPLAY ────────────────────────────────────────
+function showCombo(n){
+  const msgs=["DOUBLE! 🔥","TRIPLE! 💥","MEGA! ⚡","ULTRA! 🌟","INSANE! 🌈"];
+  const colors=["#fde047","#fb923c","#f472b6","#a78bfa","#60a5fa"];
+  const cd=document.getElementById("combo-display");
+  cd.textContent=msgs[Math.min(n-2,msgs.length-1)];
+  cd.style.color=colors[Math.min(n-2,colors.length-1)];
+  cd.style.display="block";
+  cd.style.animation="none";
+  cd.offsetHeight;
+  cd.style.animation="comboPop .6s cubic-bezier(.34,1.56,.64,1) forwards";
+  setTimeout(()=>cd.style.display="none",700);
+}
+
+// ─── HUD ─────────────────────────────────────────────────
+function updateHUD(){
+  document.getElementById("score-disp").textContent=score.toLocaleString();
+  document.getElementById("best-disp").textContent=best.toLocaleString();
+  document.getElementById("level-disp").textContent=level;
+  const livesStr="❤️".repeat(Math.max(0,lives))+"🖤".repeat(Math.max(0,3-lives));
+  document.getElementById("lives-disp").textContent=livesStr;
+  document.getElementById("moves-disp").textContent=moves;
+  // progress toward target score
+  const cfg=getLevelConfig(level);
+  const pct=Math.min(100,Math.round((score/cfg.targetScore)*100));
+  document.getElementById("prog-fill").style.width=pct+"%";
+}
+
+function updateTargetDisplay(){
+  const cfg=getLevelConfig(level);
+  const container=document.getElementById("target-items");
+  container.innerHTML="";
+  Object.entries(cfg.targets).forEach(([candy,need])=>{
+    const got=collected[candy]||0;
+    const done=got>=need;
+    const item=document.createElement("div");
+    item.className="target-item";
+    item.innerHTML=`<span class="target-emoji">${candy}</span><span class="target-count${done?" done":""}">${done?"✓":Math.max(0,need-got)}</span>`;
+    container.appendChild(item);
+  });
+}
+
+// ─── GAME STATE ──────────────────────────────────────────
+function checkGameState(){
+  const cfg=getLevelConfig(level);
+  // check targets met
+  const allMet=Object.entries(cfg.targets).every(([candy,need])=>(collected[candy]||0)>=need);
+  if(allMet){
+    setTimeout(()=>showLevelComplete(),400);
+    return;
+  }
+  if(moves<=0){
+    lives--;
+    if(lives<=0){ setTimeout(()=>showGameOver(),400); }
+    else { setTimeout(()=>showOutOfMoves(),400); }
+  }
+}
+
+function showLevelComplete(){
+  const stars=moves>10?3:moves>4?2:1;
+  const bonusScore=moves*500;
+  score+=bonusScore;
+  if(score>best){best=score;localStorage.setItem("sc_best",best);}
+  showModal(`
+    <span class="modal-emoji">🎉</span>
+    <div class="modal-title">Level ${level} Clear!</div>
+    <div class="stars-row">
+      ${"⭐".repeat(stars)}${"☆".repeat(3-stars)}
+    </div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:4px">Score</div>
+    <div class="modal-score">${score.toLocaleString()}</div>
+    <div style="font-size:13px;color:#86efac;margin-bottom:1.5rem">+${bonusScore.toLocaleString()} moves bonus!</div>
+    <button class="btn btn-primary" onclick="nextLevel()">Next Level →</button>
+  `);
+}
+
+function showGameOver(){
+  showModal(`
+    <span class="modal-emoji">💔</span>
+    <div class="modal-title">Game Over!</div>
+    <div class="modal-msg">You ran out of lives. Better luck next time!</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:4px">Final Score</div>
+    <div class="modal-score">${score.toLocaleString()}</div>
+    <button class="btn btn-primary" onclick="newGame()">Play Again</button>
+  `);
+}
+
+function showOutOfMoves(){
+  showModal(`
+    <span class="modal-emoji">😬</span>
+    <div class="modal-title">No Moves Left!</div>
+    <div class="modal-msg">You have ${lives} ${lives===1?"life":"lives"} remaining.</div>
+    <button class="btn btn-primary" onclick="retryLevel()">Try Again ❤️</button>
+    <button class="btn btn-secondary" onclick="newGame()">Quit</button>
+  `);
+}
+
+function showModal(html){
+  const ov=document.createElement("div"); ov.className="overlay"; ov.id="modal-overlay";
+  const m=document.createElement("div"); m.className="modal"; m.innerHTML=html;
+  ov.appendChild(m); document.body.appendChild(ov);
+}
+
+function closeModal(){
+  const ov=document.getElementById("modal-overlay");
+  if(ov)ov.remove();
+}
+
+function nextLevel(){
+  closeModal();
+  level++;
+  const cfg=getLevelConfig(level);
+  moves=cfg.moves;
+  targets=cfg.targets;
+  collected={};
+  initBoard();
+  renderBoard();
+  updateHUD();
+  updateTargetDisplay();
+  scheduleHint();
+}
+
+function retryLevel(){
+  closeModal();
+  const cfg=getLevelConfig(level);
+  moves=cfg.moves;
+  initBoard();
+  renderBoard();
+  updateHUD();
+  updateTargetDisplay();
+  scheduleHint();
+}
+
+function newGame(){
+  closeModal();
+  score=0;level=1;lives=3;comboCount=0;
+  const cfg=getLevelConfig(level);
+  moves=cfg.moves; targets=cfg.targets; collected={};
+  initBoard(); renderBoard(); updateHUD(); updateTargetDisplay(); scheduleHint();
+}
+
+// ─── BOOT ────────────────────────────────────────────────
+makeStars();
+makeBubbles();
+const startCfg=getLevelConfig(1);
+moves=startCfg.moves; targets=startCfg.targets; collected={};
+initBoard();
+renderBoard();
+updateHUD();
+updateTargetDisplay();
+scheduleHint();
+
+// Show welcome modal
+setTimeout(()=>{
+  showModal(`
+    <span class="modal-emoji">🍬</span>
+    <div class="modal-title">Sweet Crush</div>
+    <div class="modal-msg">Swap adjacent candies to match 3 or more!<br>Collect the targets before moves run out.<br><br>💡 <strong>5-in-a-row</strong> = 💣 Bomb<br>🌈 <strong>6-in-a-row</strong> = Rainbow candy</div>
+    <button class="btn btn-primary" onclick="closeModal();scheduleHint()">Play! 🍭</button>
+  `);
+},400);
+</script>
+</body>
+</html>
